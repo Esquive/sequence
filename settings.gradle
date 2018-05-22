@@ -1,0 +1,4 @@
+rootProject.name = 'sequence'
+include 'ans'
+findProject(':ans')?.name = 'sequence'
+
