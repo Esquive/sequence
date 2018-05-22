@@ -2,34 +2,35 @@ package one.niu.sequence.ans.encoding;
 
 import one.niu.sequence.ans.util.BitOutputStream;
 import one.niu.sequence.ans.util.ByteBufferOutputStream;
+import one.niu.sequence.ans.util.FrequencyTable;
+import one.niu.sequence.ans.util.ReverseByteBufferInputStream;
 import one.niu.sequence.ans.util.StateEncodingTuple;
-import one.niu.sequence.ans.util.SymbolCorrectionDeltaTuple;
+import one.niu.sequence.ans.util.SymbolScaledFrequencyTuple;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.Arrays;
+import java.nio.ByteBuffer;
+import java.util.Comparator;
 import java.util.HashMap;
-import java.util.LinkedList;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.stream.IntStream;
 
 public class TANSEncoder implements Closeable {
 
   //Constructor Stuff
   private final OutputStream outputStream;
-  private Integer[] frequencies;
-  private final Integer trueTotal;
-  private Double[] trueProbabilities;
+  private final FrequencyTable frequencies;
 
 
   //Entropy Coding parameters
   private final int precision;
   private final int m;
-  private int[] scaledFrequencies;
-  private int correction;
 
   //Variables for algorithm execution
-  private final HashMap<StateEncodingTuple,Integer> stateTable;
+  private final HashMap<StateEncodingTuple, Integer> stateTable;
   private int currentState;
 
   private final ByteBufferOutputStream encodingBuffer;
@@ -38,110 +39,122 @@ public class TANSEncoder implements Closeable {
   public TANSEncoder(OutputStream outputStream, Integer[] frequencies) {
 
     this.outputStream = outputStream;
-    this.frequencies = frequencies;
-    this.trueTotal = Arrays.stream(this.frequencies).reduce(0, (a,b) -> a + b);
-    this.trueProbabilities = new Double[frequencies.length];
-    Arrays.fill(this.trueProbabilities,0.0);
-    for(int i = 0 ; i < this.frequencies.length ; i++){
-      this.trueProbabilities[i] = ((double)this.frequencies[i]) / ((double)trueTotal);
-    }
 
-    this.precision = (int)Math.floor( Math.log10( frequencies.length ) / Math.log10(2) ) + 3;
+    this.precision = (int) Math.floor(Math.log10(frequencies.length) / Math.log10(2)) + 3;
     this.m = 1 << precision;
 
-    this.scaledFrequencies = new int[frequencies.length];
-    Arrays.fill(scaledFrequencies, 0);
-    this.correction = m;
+    this.frequencies = new FrequencyTable(this.m, frequencies);
 
     this.currentState = (m << 1) - 1;
 
     this.encodingBuffer = new ByteBufferOutputStream(500 * 1024 * 1024);
     this.bitOutputStream = new BitOutputStream(this.encodingBuffer);
 
-    this.stateTable = new HashMap<>();
 
-    this.scale();
-    if(correction != 0)    this.correctScaling();
+    this.stateTable = new HashMap<>();
     this.buildStateTable();
 
-
-    //TODO: Make them method parameters and return values.
-    this.frequencies = null;
-    this.trueProbabilities = null;
+    System.out.println("Finished building the state table.");
 
   }
 
-  private void scale() {
-    double symbolScaledFrequency = -1.0;
-    int scaledDownValue = -1;
 
-    for(int i = 0; i < frequencies.length; i++){
-      symbolScaledFrequency = ((double)(this.frequencies[i] * m)) / ((double)trueTotal);
-      scaledDownValue = (int)symbolScaledFrequency;
-      this.scaledFrequencies[i] = ( (symbolScaledFrequency * symbolScaledFrequency) <= (scaledDownValue * (scaledDownValue + 1)) ) ? scaledDownValue : scaledDownValue + 1;
-      correction -= this.scaledFrequencies[i];
-    }
-  }
 
-  private void correctScaling() {
-    final int correctionSign = (correction > 0) ? 1 : -1;
-    final LinkedList<SymbolCorrectionDeltaTuple> deltas = new LinkedList<>();
-    final PriorityQueue<SymbolCorrectionDeltaTuple> heap = new PriorityQueue<>(new SymbolCorrectionHeapOrdering());
-
-    for(int i = 0; i < scaledFrequencies.length; i++){
-      if(scaledFrequencies[i] > 1){
-        heap.add(new SymbolCorrectionDeltaTuple(
-          i,
-          this.calculateDelta(i, correctionSign)));
-      }
-    }
-
-    SymbolCorrectionDeltaTuple iterator;
-    while(this.correction != 0){
-      iterator = heap.poll();
-      this.scaledFrequencies[iterator.getSymbol()] += correctionSign;
-      this.correction -= correctionSign;
-      if(scaledFrequencies[iterator.getSymbol()] > 1){
-        iterator.setDelta(this.calculateDelta(iterator.getSymbol(), correctionSign));
-        heap.add(iterator);
-      }
-    }
-  }
-
+  //TODO: Make a pluggable state table building.
   private void buildStateTable() {
     PriorityQueue<StateEncodingTuple> order = new PriorityQueue<>(new StateEncodingComparable());
-    for(int i = 0; i < scaledFrequencies.length; i++){
-      for(int position = 1; position <= scaledFrequencies[i]; position++) {
+    Iterator<SymbolScaledFrequencyTuple> symbolScaledFrequencyTupleIterator = frequencies.iterator();
+    SymbolScaledFrequencyTuple symbolScaledFrequencyTuple;
 
-        order.add( new StateEncodingTuple(
-           (int)Math.round( this.m * position / (double)scaledFrequencies[i]), i) );
-
+    while (symbolScaledFrequencyTupleIterator.hasNext()) {
+      symbolScaledFrequencyTuple = symbolScaledFrequencyTupleIterator.next();
+      for (int position = 1; position <= symbolScaledFrequencyTuple.getScaledFrequency(); position++) {
+        order.add(new StateEncodingTuple(
+          (int) Math.round(this.m * position / (double) symbolScaledFrequencyTuple.getScaledFrequency()), symbolScaledFrequencyTuple.getSymbol()));
       }
     }
 
     StateEncodingTuple iterator;
     int nextState = 0;
-    while(order.size() > 0){
+    while (order.size() > 0) {
       iterator = order.poll();
-      iterator.setState(this.scaledFrequencies[iterator.getSymbol()]);
-      this.stateTable.put(iterator, nextState+this.m);
+      iterator.setState(this.frequencies.getScaledFrequencyForSymbol(iterator.getSymbol()));
+      this.stateTable.put(iterator, nextState + this.m);
 
       //Prepare for next iteration
-      this.scaledFrequencies[iterator.getSymbol()] += 1;
+      this.frequencies.incrementScaledFrequencyForSymbol(iterator.getSymbol());
       nextState++;
     }
 
   }
 
-
-  private Double calculateDelta(int symbol, int correctionSign){
-    return trueProbabilities[symbol] * Math.log10( ((double)scaledFrequencies[symbol]) / ((double)scaledFrequencies[symbol] + (double)correctionSign) ) / Math.log10(2.0);
+  public void encode(int symbol) throws IOException {
+    this.writeSymbol(symbol);
   }
 
+  public void encode(ByteBuffer buffer) throws IOException {
+    while (buffer.position() < buffer.limit()) {
+      writeSymbol(buffer.get());
+    }
+  }
+
+  private void writeSymbol(int symbol) throws IOException {
+    Integer transition;
+    while ((transition = this.stateTable.get(new StateEncodingTuple(this.currentState, symbol))) == null) {
+      this.bitOutputStream.write(currentState & 0x01);
+      this.currentState = currentState >> 1;
+    }
+    this.currentState = transition;
+  }
+
+  public void writeStateTable(OutputStream outputStream) throws IOException {
+    IntStream compactTable = this.stateTable.entrySet().stream()
+      .sorted(Comparator.comparingInt(Map.Entry::getValue))
+      .mapToInt(entry -> (entry.getKey().getSymbol()));
+
+    //TODO: Change that if I cannot throw an exception in a fucking Lambda
+    compactTable.forEach(x -> {
+      try {
+        outputStream.write(x);
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+    });
+  }
+
+  protected void writeFinalState(int b) throws IOException {
+    int iterator = b;
+    while (iterator != 0) {
+      int value = iterator & 0x01;
+      bitOutputStream.write(value);
+      iterator >>= 1;
+    }
+  }
 
   @Override
   public void close() throws IOException {
+    this.writeFinalState(currentState)
+    bitOutputStream.flush()
 
+    //Writing the encoding in reverse order.
+    ReverseByteBufferInputStream reverseReadBuffer = new ReverseByteBufferInputStream(this.encodingBuffer.getBuffer());
+    int cByte = -1;
+    while(
+      (cByte = reverseReadBuffer.read())!= -1 ){
+      outputStream.write(cByte);
+    }
+  }
+
+
+  /**
+   * Inner class for the ordering of the states in the encoding.
+   */
+  private class StateEncodingComparable implements Comparator<StateEncodingTuple> {
+
+    @Override
+    public int compare(StateEncodingTuple o1, StateEncodingTuple o2) {
+      return Integer.compare(o1.getState(), o2.getState());
+    }
   }
 
 }

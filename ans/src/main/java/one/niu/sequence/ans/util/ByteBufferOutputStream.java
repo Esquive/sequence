@@ -26,4 +26,8 @@ public class ByteBufferOutputStream extends OutputStream implements Closeable{
   public void close() {
      this.buffer = null;
   }
+
+  public ByteBuffer getBuffer() {
+    return buffer;
+  }
 }
