@@ -53,9 +53,6 @@ public class TANSEncoder implements Closeable {
 
     this.stateTable = new HashMap<>();
     this.buildStateTable();
-
-    System.out.println("Finished building the state table.");
-
   }
 
 
@@ -131,10 +128,16 @@ public class TANSEncoder implements Closeable {
     }
   }
 
+//  public Integer flushToEnd() {
+//    var byteCopy = bitOutputStream.getCurrentByte();
+//    bitOutputStream.reset();
+//    return byteCopy;
+//  }
+
   @Override
   public void close() throws IOException {
-    this.writeFinalState(currentState)
-    bitOutputStream.flush()
+    this.writeFinalState(currentState);
+    bitOutputStream.flush();
 
     //Writing the encoding in reverse order.
     ReverseByteBufferInputStream reverseReadBuffer = new ReverseByteBufferInputStream(this.encodingBuffer.getBuffer());
@@ -143,6 +146,8 @@ public class TANSEncoder implements Closeable {
       (cByte = reverseReadBuffer.read())!= -1 ){
       outputStream.write(cByte);
     }
+    this.outputStream.flush();
+    this.outputStream.close();
   }
 
 

@@ -26,4 +26,12 @@ public class StateEncodingTuple {
   public int hashCode() {
     return state * 31 + symbol;
   }
+
+  @Override
+  public boolean equals(Object obj) {
+    if(obj instanceof StateEncodingTuple){
+      return ((StateEncodingTuple)obj).getSymbol() == this.symbol && ((StateEncodingTuple)obj).getState() == this.state;
+    }
+    return false;
+  }
 }
