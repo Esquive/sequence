@@ -1,6 +1,7 @@
 package one.niu.sequence.entropycoding.ans;
 
 import one.niu.libs.files.fileio.ByteBufferFileInputStream;
+import one.niu.sequence.entropycoding.util.BitInputStream;
 import one.niu.sequence.entropycoding.util.ReverseBitInputStream;
 import one.niu.sequence.entropycoding.util.StateDecodingTuple;
 
@@ -65,7 +66,7 @@ public class TANSDecoder implements Closeable {
 
   public void decode(OutputStream output) throws IOException {
 
-    try (InputStream inputStream = new ReverseBitInputStream(
+    try (InputStream inputStream = new BitInputStream(
       new ByteBufferFileInputStream(raf.getChannel()))) {
       int nextBit = -1;
       StateDecodingTuple symbolAndState;

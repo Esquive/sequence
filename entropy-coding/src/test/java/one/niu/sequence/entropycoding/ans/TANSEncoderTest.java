@@ -83,8 +83,8 @@ public class TANSEncoderTest extends TestSuite{
   @Test
   public void Test03_Decoding(){
     try (
-      TANSDecoder decoder = new TANSDecoder(new File("book1.tans"));
-      ByteBufferFileOutputStream output = new ByteBufferFileOutputStream(new RandomAccessFile("book1","rw").getChannel())
+      TANSDecoder decoder = new TANSDecoder(new File("book1cpp.tans"));
+      ByteBufferFileOutputStream output = new ByteBufferFileOutputStream(new RandomAccessFile("book1cpp","rw").getChannel())
     ){
       decoder.readStateTable(2*1024);
       decoder.decode(output);

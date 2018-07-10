@@ -139,6 +139,7 @@ public class TANSEncoder implements Closeable {
     bitOutputStream.flush();
 
     //Writing the encoding in reverse order.
+    //TODO: For now only the bytes are in reversed. Think of reversing the bits all together.
     ReverseByteBufferInputStream reverseReadBuffer = new ReverseByteBufferInputStream(this.encodingBuffer.getBuffer());
     int cByte = -1;
     while(
@@ -157,7 +158,7 @@ public class TANSEncoder implements Closeable {
 
     @Override
     public int compare(StateEncodingTuple o1, StateEncodingTuple o2) {
-      return Integer.compare(o1.getState(), o2.getState());
+        return Integer.compare(o1.getState(), o2.getState());
     }
   }
 

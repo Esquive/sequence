@@ -37,6 +37,7 @@ public class FrequencyTable implements Iterable<SymbolScaledFrequencyTuple> {
       scaledDownValue = (int) symbolScaledFrequency;
       this.scaledFrequencies[i] = ((symbolScaledFrequency * symbolScaledFrequency) <= (scaledDownValue * (scaledDownValue + 1))) ? scaledDownValue : scaledDownValue + 1;
       correction -= this.scaledFrequencies[i];
+      System.out.println(correction);
     }
   }
 
@@ -47,7 +48,6 @@ public class FrequencyTable implements Iterable<SymbolScaledFrequencyTuple> {
     }
 
     final int correctionSign = (correction > 0) ? 1 : -1;
-    final LinkedList<SymbolCorrectionDeltaTuple> deltas = new LinkedList<>();
     final PriorityQueue<SymbolCorrectionDeltaTuple> heap = new PriorityQueue<>(new SymbolCorrectionHeapOrdering());
 
     for (int i = 0; i < scaledFrequencies.length; i++) {
