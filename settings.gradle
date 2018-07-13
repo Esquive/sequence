@@ -1,3 +1,4 @@
 rootProject.name = 'sequence'
 include 'entropy-coding'
+include 'deduplication'
 

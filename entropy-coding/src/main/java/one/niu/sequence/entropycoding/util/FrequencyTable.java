@@ -37,7 +37,7 @@ public class FrequencyTable implements Iterable<SymbolScaledFrequencyTuple> {
       scaledDownValue = (int) symbolScaledFrequency;
       this.scaledFrequencies[i] = ((symbolScaledFrequency * symbolScaledFrequency) <= (scaledDownValue * (scaledDownValue + 1))) ? scaledDownValue : scaledDownValue + 1;
       correction -= this.scaledFrequencies[i];
-      System.out.println(correction);
+//      System.out.println(correction);
     }
   }
 

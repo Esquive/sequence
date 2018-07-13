@@ -70,12 +70,24 @@ public class TANSDecoder implements Closeable {
       new ByteBufferFileInputStream(raf.getChannel()))) {
       int nextBit = -1;
       StateDecodingTuple symbolAndState;
+
+//      0
+//      0
+//      0
+//      1
+//      1
+//      1
+//      1
+//      1
+//      1
+//      0
+//      0
+
       while (((nextBit = inputStream.read()) != -1)) {
         if (currentState >= 2048) {
           if (currentState == (2048 * 2) - 1) {
             System.out.println("Maxstate Reached");
           }
-
 
           symbolAndState = this.stateTable.get(currentState);
           if (symbolAndState == null) {
